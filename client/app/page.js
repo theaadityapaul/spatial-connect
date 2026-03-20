@@ -271,31 +271,22 @@ function CampusProps() {
 // ==========================================
 // 🚶 PLAYER PHYSICS & COLLISION ENGINE
 // ==========================================
+// ==========================================
+// 🚶 PLAYER PHYSICS & COLLISION ENGINE
+// ==========================================
 function Avatar({ id, position, serverAction, color, isMain, onMove, chatMsg, playersList, onNearHub, hasJoined }) {
   const groupRef = useRef();
   const keys = useRef({ ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false, shift: false });
   const lastEmitTime = useRef(0);
   
-  // 🚀 FIXED: The lock that prevents teleportation bugs
-  const hasSpawned = useRef(false);
+  const initialized = useRef(false); // 🚀 THE NEW LOCK
   
   const { camera, controls } = useThree();
   const [localAction, setLocalAction] = useState('idle');
 
   const displayName = playersList[id]?.username || id.substring(0,4);
 
-  // 🚀 SAFE SPAWN LOGIC: Will only run EXACTLY ONCE when you join
-  useEffect(() => {
-    if (isMain && groupRef.current && controls && !hasSpawned.current) {
-      groupRef.current.position.set(0, 0, 25);
-      camera.position.set(0, 5, 35);
-      controls.target.set(0, 1.5, 25);
-      controls.update();
-      onMove({ x: 0, y: 0, z: 25, action: 'idle', rotationY: 0 });
-      hasSpawned.current = true; // Locks the spawn so it never repeats
-    }
-  }, [isMain, controls, camera, onMove]);
-
+  // Handle other players
   useEffect(() => {
     if (groupRef.current && position && !isMain) {
       groupRef.current.position.set(position.x, 0, position.z);
@@ -323,6 +314,16 @@ function Avatar({ id, position, serverAction, color, isMain, onMove, chatMsg, pl
 
   useFrame((state) => {
     if (!isMain || !groupRef.current || !controls || !hasJoined) return;
+
+    // 🚀 BULLETPROOF SPAWN: Runs on the 3D thread, guaranteed to fire AFTER controls load.
+    if (!initialized.current) {
+      groupRef.current.position.set(0, 0, 25);
+      camera.position.set(0, 5, 35);
+      controls.target.set(0, 1.5, 25);
+      controls.update();
+      initialized.current = true;
+      onMove({ x: 0, y: 0, z: 25, action: 'idle', rotationY: 0 });
+    }
 
     let nearestHub = null;
     const currentPos = groupRef.current.position;
@@ -378,7 +379,11 @@ function Avatar({ id, position, serverAction, color, isMain, onMove, chatMsg, pl
           if (tx > bx - 5.5 && tx < bx + 5.5 && tz > bz - 5.5 && tz < bz + 5.5) hit = true;
         });
 
-        if (Math.sqrt(tx*tx + tz*tz) < 8) hit = true;
+        // 🚀 THE GHOST FIX: Only block ENTRY to the fountain. If you are inside, you can walk out.
+        const currentDist = Math.sqrt(currentPos.x * currentPos.x + currentPos.z * currentPos.z);
+        const newDist = Math.sqrt(tx*tx + tz*tz);
+        
+        if (newDist < 8 && currentDist >= 8) hit = true; 
         
         return hit;
       };
@@ -402,7 +407,7 @@ function Avatar({ id, position, serverAction, color, isMain, onMove, chatMsg, pl
   const displayAction = isMain ? localAction : (serverAction || 'idle');
 
   return (
-    <group ref={groupRef} position={[position.x, 0, position.z]}>
+    <group ref={groupRef}>
       <Float speed={2} rotationIntensity={0} floatIntensity={0.2}>
         <Text position={[0, 2.2, 0]} rotation={[0, -groupRef.current?.rotation.y || 0, 0]} fontSize={0.3} color="white" outlineWidth={0.03} outlineColor="black" fontWeight="bold">
           {isMain ? `${displayName} (You)` : displayName}
