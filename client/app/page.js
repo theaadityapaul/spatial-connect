@@ -402,7 +402,7 @@ function Avatar({ id, position, serverAction, color, isMain, onMove, chatMsg, pl
   const displayAction = isMain ? localAction : (serverAction || 'idle');
 
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} position={[position.x, 0, position.z]}>
       <Float speed={2} rotationIntensity={0} floatIntensity={0.2}>
         <Text position={[0, 2.2, 0]} rotation={[0, -groupRef.current?.rotation.y || 0, 0]} fontSize={0.3} color="white" outlineWidth={0.03} outlineColor="black" fontWeight="bold">
           {isMain ? `${displayName} (You)` : displayName}
