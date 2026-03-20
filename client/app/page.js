@@ -451,11 +451,11 @@ export default function Home() {
   const [voiceEnabled, setVoiceEnabled] = useState(false); 
 
   useEffect(() => {
-    const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-    setServerAddress(host);
-    const socketUrl = `http://${host}:3001`;
+    // 🚀 NEW CLOUD CONNECTION
+    const cloudServerUrl = "https://YOUR-RENDER-URL-HERE.onrender.com"; // <--- PASTE YOUR RENDER URL HERE
+    setServerAddress("Cloud Server");
 
-    socket = io(socketUrl);
+    socket = io(cloudServerUrl);
     socket.on('connect', () => setMyId(socket.id));
     socket.on('currentPlayers', (ps) => setPlayers(ps));
     
