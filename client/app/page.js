@@ -134,7 +134,6 @@ function CentralFountain() {
   );
 }
 
-// 🚀 Batch Geometry Optimized Building
 function DetailedBuilding({ name, pos, dim, color }) {
   const [w, h, d] = dim;
   const rowsY = Math.max(1, Math.floor(h / 3.5));
@@ -271,22 +270,18 @@ function CampusProps() {
 // ==========================================
 // 🚶 PLAYER PHYSICS & COLLISION ENGINE
 // ==========================================
-// ==========================================
-// 🚶 PLAYER PHYSICS & COLLISION ENGINE
-// ==========================================
 function Avatar({ id, position, serverAction, color, isMain, onMove, chatMsg, playersList, onNearHub, hasJoined }) {
   const groupRef = useRef();
   const keys = useRef({ ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false, shift: false });
   const lastEmitTime = useRef(0);
   
-  const initialized = useRef(false); // 🚀 THE NEW LOCK
+  const initialized = useRef(false);
   
   const { camera, controls } = useThree();
   const [localAction, setLocalAction] = useState('idle');
 
   const displayName = playersList[id]?.username || id.substring(0,4);
 
-  // Handle other players
   useEffect(() => {
     if (groupRef.current && position && !isMain) {
       groupRef.current.position.set(position.x, 0, position.z);
@@ -299,6 +294,16 @@ function Avatar({ id, position, serverAction, color, isMain, onMove, chatMsg, pl
     const handleKeyDown = (e) => {
       if (keys.current.hasOwnProperty(e.key)) keys.current[e.key] = true;
       if (e.key === 'Shift') keys.current.shift = true;
+      
+      // 🚀 GOD MODE: Press 'T' to instantly teleport to the road
+      if (e.key === 't' || e.key === 'T') {
+        if (groupRef.current && camera && controls) {
+          groupRef.current.position.set(0, 0, 25);
+          camera.position.set(0, 5, 35);
+          controls.target.set(0, 1.5, 25);
+          controls.update();
+        }
+      }
     };
     const handleKeyUp = (e) => {
       if (keys.current.hasOwnProperty(e.key)) keys.current[e.key] = false;
@@ -310,12 +315,11 @@ function Avatar({ id, position, serverAction, color, isMain, onMove, chatMsg, pl
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isMain, hasJoined]);
+  }, [isMain, hasJoined, camera, controls]);
 
   useFrame((state) => {
     if (!isMain || !groupRef.current || !controls || !hasJoined) return;
 
-    // 🚀 BULLETPROOF SPAWN: Runs on the 3D thread, guaranteed to fire AFTER controls load.
     if (!initialized.current) {
       groupRef.current.position.set(0, 0, 25);
       camera.position.set(0, 5, 35);
@@ -379,7 +383,7 @@ function Avatar({ id, position, serverAction, color, isMain, onMove, chatMsg, pl
           if (tx > bx - 5.5 && tx < bx + 5.5 && tz > bz - 5.5 && tz < bz + 5.5) hit = true;
         });
 
-        // 🚀 THE GHOST FIX: Only block ENTRY to the fountain. If you are inside, you can walk out.
+        // 🚀 GHOST FIX
         const currentDist = Math.sqrt(currentPos.x * currentPos.x + currentPos.z * currentPos.z);
         const newDist = Math.sqrt(tx*tx + tz*tz);
         
@@ -407,7 +411,8 @@ function Avatar({ id, position, serverAction, color, isMain, onMove, chatMsg, pl
   const displayAction = isMain ? localAction : (serverAction || 'idle');
 
   return (
-    <group ref={groupRef}>
+    // 🚀 FRAME 1 SPAWN FIX INJECTED HERE
+    <group ref={groupRef} position={[position?.x || 0, 0, position?.z || 25]}>
       <Float speed={2} rotationIntensity={0} floatIntensity={0.2}>
         <Text position={[0, 2.2, 0]} rotation={[0, -groupRef.current?.rotation.y || 0, 0]} fontSize={0.3} color="white" outlineWidth={0.03} outlineColor="black" fontWeight="bold">
           {isMain ? `${displayName} (You)` : displayName}
@@ -456,16 +461,17 @@ export default function Home() {
   const [voiceEnabled, setVoiceEnabled] = useState(false); 
 
   useEffect(() => {
-    // 🚀 NEW CLOUD CONNECTION
-    const cloudServerUrl = "https://YOUR-RENDER-URL-HERE.onrender.com"; // <--- PASTE YOUR RENDER URL HERE
-    setServerAddress("Cloud Server");
+    // 🚀 FORCED LOCALHOST SOCKET CONNECTION INJECTED HERE
+    const cloudServerUrl = "http://localhost:3001";
+    setServerAddress("Local Server");
 
-    socket = io(cloudServerUrl);
+    socket = io(cloudServerUrl, { transports: ['websocket'], upgrade: false });
+    
     socket.on('connect', () => setMyId(socket.id));
     socket.on('currentPlayers', (ps) => setPlayers(ps));
     
     socket.on('newPlayer', async (d) => {
-      setPlayers(p => ({ ...p, [d.id]: d.player }));
+      setPlayers(p => ({ ...p, [d.id]: d.player || d }));
       if (localStreamRef.current) {
         const peerConnection = createPeerConnection(d.id);
         peersRef.current[d.id] = peerConnection;
@@ -485,9 +491,9 @@ export default function Home() {
     });
     
     socket.on('chatMessage', (d) => {
-      setPlayers(p => ({ ...p, [d.id]: { ...p[d.id], msg: d.msg } }));
-      if (d.msg !== "") {
-        setChatLedger(prev => [...prev, { id: Date.now(), sender: d.sender || d.id.substring(0,4), text: d.msg }]);
+      setPlayers(p => ({ ...p, [d.id]: { ...p[d.id], msg: d.msg || d.text } }));
+      if (d.msg !== "" && d.text !== "") {
+        setChatLedger(prev => [...prev, { id: Date.now(), sender: d.sender || d.username || d.id.substring(0,4), text: d.msg || d.text }]);
       }
     });
     
@@ -633,7 +639,7 @@ export default function Home() {
 
   const sendChat = (e) => {
     if (e.key === 'Enter' && chatInput.trim() && hasJoined) {
-      socket?.emit('chat', chatInput); 
+      socket?.emit('chatMessage', { text: chatInput, username: usernameInput }); 
       setMyMsg(chatInput);
       setChatLedger(prev => [...prev, { id: Date.now(), sender: "You", text: chatInput }]);
       setChatInput("");
@@ -644,6 +650,7 @@ export default function Home() {
   const handleJoinGame = async () => {
     if (usernameInput.trim().length > 0) {
       socket?.emit('setUsername', usernameInput.trim());
+      socket?.emit('playerMovement', { x: 0, y: 0, z: 25, action: 'idle', rotationY: 0, username: usernameInput.trim() });
       setHasJoined(true); 
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
@@ -734,7 +741,7 @@ export default function Home() {
           }}>
             <h2 style={{ margin: '0 0 10px 0', fontSize: '18px', fontWeight: 'bold' }}>🎓 SpatialConnect</h2>
             <p style={{ margin: '5px 0', fontSize: '14px', color: '#4ade80' }}>● Connected</p>
-            <p style={{ margin: '5px 0', fontSize: '14px', color: '#ccc' }}>User: {players[myId]?.username || 'Loading...'}</p>
+            <p style={{ margin: '5px 0', fontSize: '14px', color: '#ccc' }}>User: {players[myId]?.username || usernameInput}</p>
             <hr style={{ borderColor: 'rgba(255,255,255,0.1)', margin: '10px 0' }} />
             <p style={{ margin: '5px 0', fontSize: '14px', fontWeight: 'bold' }}>👥 Students Online: {Object.keys(players).length}</p>
             <p style={{ margin: '5px 0', fontSize: '14px', fontWeight: 'bold', color: voiceEnabled ? '#fbbf24' : '#ef4444' }}>
@@ -742,7 +749,6 @@ export default function Home() {
             </p>
           </div>
 
-          {/* 🚀 FIXED: Chat Ledger with Clear Button */}
           <div style={{
             position: 'absolute', bottom: '80px', left: '20px', width: '300px', height: '200px', 
             background: 'rgba(15, 23, 42, 0.8)', border: '1px solid #334155', borderRadius: '10px', 
@@ -988,7 +994,7 @@ export default function Home() {
             color={id === myId ? "#3b82f6" : "#ef4444"} 
             isMain={id === myId} 
             hasJoined={hasJoined} 
-            onMove={(pos) => socket?.emit('move', pos)} 
+            onMove={(pos) => socket?.emit('playerMovement', pos)} 
             chatMsg={id === myId ? myMsg : players[id].msg} 
             playersList={players}
             onNearHub={(hubId) => {
